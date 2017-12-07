@@ -7,7 +7,7 @@ output:
     theme: journal
     vertical_layout: fill
     navbar:
-      - { title: "Home", href: "https://example.com/about", align: right }
+      - { title: "Home", href: "https://fionalav.github.io/p8105_final_project/", align: right }
       - { icon: fa-github fa-lg, href: "https://github.com/Fionalav/p8105_final_project", align: right }
 
 ---
