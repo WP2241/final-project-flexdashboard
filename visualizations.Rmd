@@ -1,0 +1,111 @@
+---
+title: Visualizations
+output: 
+ flexdashboard::flex_dashboard:
+    source_code: embed
+    orientation: columns
+    theme: journal
+    vertical_layout: fill
+    navbar:
+      - { title: "Home", href: "https://example.com/about", align: right }
+      - { icon: fa-github fa-lg, href: "https://github.com/Fionalav/p8105_final_project", align: right }
+
+---
+    
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(rvest)
+library(httr)
+library(janitor)
+library(stringr)
+library(readxl)
+library(plotly)
+library(dplyr)
+library(viridisLite)
+library(forecast)
+library(flexdashboard)
+library(fiftystater)
+library(RColorBrewer)
+library(broom)
+library(knitr)
+library(forcats)
+```
+
+
+```{r import_data, include=FALSE}
+cod_data = read_csv("./data/NCHS_-_Potentially_Excess_Deaths_from_the_Five_Leading_Causes_of_Death.csv") %>%
+  clean_names() %>%
+  na.omit() %>%
+  filter(!(state == "United States")) %>%
+  separate(., percent_potentially_excess_deaths, into = c("percent_excess_death"), sep = "%") %>% 
+  mutate(percent_excess_death = as.numeric(percent_excess_death), mortality = observed_deaths/population * 10000, mortality = as.numeric(mortality)) %>% 
+  select(year, age_range, cause_of_death, state, locality, observed_deaths, population, expected_deaths, potentially_excess_deaths, percent_excess_death, mortality, hhs_region)
+```
+
+
+Column {.tabset .tabset-fade}
+-----------------------------------------------------------------------
+
+### Rural-urban Disparty of Mean Percent Excess Death Across Public Health Regions 
+
+```{r}
+
+plotly1 = cod_data %>%
+  select(state, locality, percent_excess_death, hhs_region, cause_of_death) %>%
+  filter(locality != "All") %>% 
+  group_by(cause_of_death, locality, hhs_region) %>% 
+  summarise(mean_ped = mean(percent_excess_death)) %>% 
+  mutate(hhs_region = as.factor(hhs_region)) %>% 
+  group_by(cause_of_death) %>% 
+  mutate(mean_ped_order = mean(mean_ped)) %>% 
+  ungroup(cause_of_death) %>% 
+  mutate(cause_of_death = fct_reorder(cause_of_death,mean_ped_order))
+
+plotly1 %>%
+plot_ly(
+    x = ~hhs_region, 
+    y = ~mean_ped, 
+    color = ~cause_of_death, 
+    frame = ~locality, 
+    text = ~mean_ped, 
+    hoverinfo = "text",
+    type = 'bar',
+    mode = 'markers'
+  ) %>% 
+  layout(
+         xaxis = list(title = "Pulic Health Regions"),
+         yaxis = list(title = "Mean Percent Excess Death"))
+
+```   
+
+### U.S. Map with Mean Percent of Excess Death Rate Distribution
+```{r}
+map_cod_data = cod_data %>%
+  filter(locality == "Metropolitan") %>%
+  select(state, locality, percent_excess_death) %>% 
+  group_by(state) %>% 
+  summarise(mean_ped = mean(percent_excess_death)) %>% 
+  dplyr::filter(!(state == "District of\nColumbia"))
+  
+
+map = as.tibble(fifty_states) %>%
+  group_by(id) %>% 
+  summarize(clong = mean(long), clat = mean(lat)) %>% 
+  filter(!(id == "district of columbia"))
+
+df <- cbind(map, state.abb, state.center, rate = unique(map_cod_data$mean_ped))
+
+ggplot(df, aes(map_id = id)) + 
+    geom_map(aes(fill = rate), map = fifty_states) + 
+    expand_limits(x = fifty_states$long, y = fifty_states$lat) + 
+    labs(x = "", y = "") +
+    theme(panel.background = element_blank(), 
+          axis.text.x = element_blank(), 
+          axis.text.y = element_blank(), 
+          axis.ticks = element_blank()) + 
+    geom_text(aes(x = clong, y = clat, label = state.abb)) +
+  scale_fill_gradient(low="gold", high="red")
+
+
+```    
